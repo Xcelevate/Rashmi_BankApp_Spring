@@ -2,7 +2,7 @@
 package org.example;
 
 import org.example.config.SpringConfig;
-import org.example.Entities.*;
+import org.example.entities.*;
 import org.example.service.BankingService;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 

@@ -1,7 +1,9 @@
 package org.example.service;
 
-import org.example.dao.*;
-import org.example.Entities.*;
+import org.example.entities.*;
+import org.example.repository.*;
+import org.example.exceptions.*;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,74 +14,85 @@ import java.util.List;
 public class BankingService {
 
     @Autowired
-    private UserDAO userDAO;
+    private UserRepository userRepo;
 
     @Autowired
-    private AccountDAO accountDAO;
+    private AccountRepository accountRepo;
 
     @Autowired
-    private TransactionDAO transactionDAO;
+    private TransactionRepository txRepo;
 
-    public User login(int id, String password) {
-        return userDAO.login(id, password);
+    public User login(int id,String password){
+
+        User user = userRepo.findByIdAndPassword(id,password);
+
+        if(user == null)
+            throw new UserNotFoundException("Invalid credentials");
+
+        return user;
     }
 
     @Transactional
-    public Account createAccount(User user) {
+    public User createUser(String name,String pwd){
+
+        User user = new User();
+        user.setName(name);
+        user.setPassword(pwd);
+
+        return userRepo.save(user);
+    }
+
+    @Transactional
+    public Account createAccount(User user){
+
         Account acc = new Account();
         acc.setUser(user);
         acc.setBalance(0);
-        accountDAO.save(acc);
-        return acc;
+
+        return accountRepo.save(acc);
     }
 
-    public List<Account> getAccounts(User user) {
-        return accountDAO.findByUser(user);
+    public List<Account> getAccounts(User user){
+        return accountRepo.findByUser(user);
     }
 
     @Transactional
-    public void deposit(int accId, double amount) {
-        Account acc = accountDAO.findById(accId);
-        acc.setBalance(acc.getBalance() + amount);
+    public void deposit(int accId,double amount){
+
+        Account acc = accountRepo.findById(accId).orElseThrow();
+
+        acc.setBalance(acc.getBalance()+amount);
 
         Transaction tx = new Transaction();
         tx.setType("DEPOSIT");
         tx.setAmount(amount);
         tx.setAccount(acc);
-        transactionDAO.save(tx);
+
+        txRepo.save(tx);
     }
 
-
     @Transactional
-    public void withdraw(int accId, double amount) {
-        Account acc = accountDAO.findById(accId);
+    public void withdraw(int accId,double amount){
 
-        if (acc.getBalance() < amount) {
-            throw new RuntimeException("Insufficient Balance");
-        }
+        Account acc = accountRepo.findById(accId).orElseThrow();
 
-        acc.setBalance(acc.getBalance() - amount);
+        if(acc.getBalance()<amount)
+            throw new InsufficientBalanceException("Insufficient balance");
+
+        acc.setBalance(acc.getBalance()-amount);
 
         Transaction tx = new Transaction();
         tx.setType("WITHDRAW");
         tx.setAmount(amount);
         tx.setAccount(acc);
-        transactionDAO.save(tx);
+
+        txRepo.save(tx);
     }
 
     @Transactional
-    public void transfer(int fromId, int toId, double amount) {
-        withdraw(fromId, amount);
-        deposit(toId, amount);
-    }
+    public void transfer(int fromId,int toId,double amount){
 
-    @Transactional
-    public User createUser(String name, String pwd) {
-        User user = new User();
-        user.setName(name);
-        user.setPassword(pwd);
-
-        userDAO.save(user);
-        return user;
+        withdraw(fromId,amount);
+        deposit(toId,amount);
     }
 }
